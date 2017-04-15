@@ -7,15 +7,15 @@ import logging
 import re
 import random
 
-logpath = 'results_hero_academia.log'
-if os.path.exists(logpath):
-    os.remove(logpath)
-logging.basicConfig(filename=logpath)
+# logpath = 'results_hero_academia.log'
+# if os.path.exists(logpath):
+#     pass
+# logging.basicConfig(filename=logpath)
 
 domain = "http://eatmanga.com"
 
 def main():
-    outputPath = "./output/"
+    outputPath = ".\\output\\"
     if not os.path.exists(outputPath):
         os.mkdir(outputPath)
 
@@ -28,7 +28,7 @@ def main():
         next_page = chapters_list.pop()
         next_url = domain + next_page
         download_chapter(next_url)
-        logging.warning(next_page + " Remaining: " + str(len(chapters_list)))
+        print("Remaining Chapters in List: " + str(len(chapters_list)))
 
 def download_chapter(url):
     match = re.match(".+\/upcoming\/.+", url)
@@ -38,48 +38,67 @@ def download_chapter(url):
 
     chapter_regex = re.compile('.+\/Boku-No-Hero-Academia-(\d+(-\w*){0,1})(\/.*){0,1}')
     chapter = chapter_regex.match(url).group(1)
-
-    local_chapter_path = "./output/Chapter " + chapter + "/"
+    
+    local_chapter_path = ".\\output\\Chapter " + chapter + "\\"
+#     incomplete_local_chapter_path = ".\\output\\Chapter " + chapter + " INCOMPLETE\\"
+    if os.path.exists(local_chapter_path):
+        print('Chapter ' + chapter + ' fully downloaded. Proceeding to next chapter.')
+        return
+    
     if not os.path.exists(local_chapter_path):
         os.mkdir(local_chapter_path)
 
     download_page(url, local_chapter_path)
+    
+#     time.sleep(3)
+#     if os.access(incomplete_local_chapter_path, os.W_OK):
+#          os.rename(incomplete_local_chapter_path, local_chapter_path)
+#     else:
+#         print('Could not access folder for renaming. Wait 3 seconds.')
+#         time.sleep(3)
+#         if os.access(incomplete_local_chapter_path, os.W_OK):
+#             os.rename(incomplete_local_chapter_path, local_chapter_path)
+#         else:
+#             print('Could not access folder for renaming (2nd try). Skipping renaming')
 
 def download_page(url, local_chapter_path):
     response = throttled_get_request(url)
     content = html.fromstring(response.content)
-    image_url = content.xpath('//img[@id="eatmanga_image"]/@src | //img[@id="eatmanga_image_big"]/@src')[0]
-
-    if image_url is not None:
+    image_url_list = content.xpath('//img[@id="eatmanga_image"]/@src | //img[@id="eatmanga_image_big"]/@src')
+    if len(image_url_list) > 0:
+        image_url = image_url_list[0]
         save_image_to_disk(image_url, local_chapter_path)
     else:
-        logging.warning("Could not find image on page, skipping.");
+        print("Could not find image on page, skipping.");
 
     # go to next page if possible
-    next_page = content.xpath('//div[@class="navigation"]/a[@id="page_next"]/@href')
-    if len(next_page) > 0:
-        next_page = domain + next_page[0]
+    next_page_list = content.xpath('//div[@class="navigation"]/a[@id="page_next"]/@href')
+    if len(next_page_list) > 0:
+        next_page = next_page_list[0]
         if next_page != 'javascript:void(0);':
+            next_page = domain + next_page
             download_page(next_page, local_chapter_path)
+        else:
+            print("javascript:void(0) found. End of chapter.")
     else:
-        logging.warning("Could not find next page link. Ending chapter download.")
+        print("Could not find next page link. Ending chapter download.")
 
 def save_image_to_disk(image_url, local_chapter_path):
     local_file_path = local_chapter_path + image_url.split('/')[-1]
     if not os.path.exists(local_file_path):
         response = requests.get(image_url, stream=True)
         if response.status_code == 200:
-            logging.warning("Saving " + image_url + " ---> " + local_file_path)
+            print("Saving " + image_url + " ---> " + local_file_path)
             with open(local_file_path, 'wb') as local_file:
                 response.raw.decode_content = True
                 shutil.copyfileobj(response.raw, local_file)
     else:
-        logging.warning(local_file_path + " already exists. Skipping download from server.")
+        print(local_file_path + " already exists. Skipping download from server.")
 
 def throttled_get_request(url):
     r = requests.get(url)
-    random_wait = (random.random() * 3) + 2
-    print("----- waiting " + str(random_wait) + " seconds -----")
+    random_wait = (random.random() * 2) + 1
+#     print("----- waiting " + str(random_wait) + " seconds -----")
     time.sleep(random_wait)
     return r
 
